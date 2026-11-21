@@ -116,7 +116,7 @@ function draw(n, today = new Date()) {
 
   // 1. about
   command('cat about.txt'); y += LH;
-  parts.push(appear(t, run(X0, y, "I make apps I'd want to use myself.", TEXT))); t += 0.4; y += LH + 12;
+  parts.push(appear(t, run(X0, y, "I do things I like.", TEXT))); t += 0.4; y += LH + 12;
 
   // 2. neofetch: on the left a turning cube and the last 26 weeks as a heatmap, on the right the numbers
   command('neofetch'); y += LH + 8;
@@ -198,7 +198,7 @@ function draw(n, today = new Date()) {
   // and the cursor, blinking for good
   parts.push(appear(t, `${run(X0, y, PROMPT, GREEN)}<rect x="${f2(px)}" y="${y - FS + 2}" width="${CW}" height="${FS + 1}" fill="${GREEN}"><animate attributeName="opacity" values="1;0" dur="1.06s" calcMode="discrete" repeatCount="indefinite" begin="${f2(t)}s"/></rect>`));
   const H = y + 20;
-  const label = `A retro terminal. cat about.txt: I make apps I'd want to use myself. neofetch: ${rows.slice(2).map(([k, v]) => `${k} ${v}`).join('; ')}, beside a heatmap of the last 26 weeks. fortune: ${quote} (${who})`;
+  const label = `A retro terminal. cat about.txt: I do things I like. neofetch: ${rows.slice(2).map(([k, v]) => `${k} ${v}`).join('; ')}, beside a heatmap of the last 26 weeks. fortune: ${quote} (${who})`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">
 <defs>
 <filter id="glow" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="1.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
