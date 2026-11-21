@@ -33,12 +33,13 @@ async function numbers() {
   for (const d of days) { run = d.contributionCount ? run + 1 : 0; best = Math.max(best, run); }
   let streak = 0; // (today with nothing yet doesn't break it)
   for (let i = days.length - 1; i >= 0; i--) { if (days[i].contributionCount) streak++; else if (i < days.length - 1) break; }
-  const avg = (n) => days.slice(-n).reduce((s, d) => s + d.contributionCount, 0) / n;
+  const avg = (n) => days.slice(-n - 1, -1).reduce( // (finished days only: today has barely begun when this runs)
+    (s, d) => s + d.contributionCount, 0) / n;
   return {
     since: new Date(u.createdAt), repos: u.repositories.totalCount,
     contributions: cc.contributionCalendar.totalContributions,
     commits: cc.totalCommitContributions + cc.restrictedContributionsCount,
-    streak, best, load: [avg(1), avg(7), avg(30)], weeks,
+    streak, best, perDay: [avg(7), avg(30)], weeks,
     languages: [...langs].sort((a, b) => b[1] - a[1]).map(([name, size]) => ({ name, share: size / total })),
   };
 }
@@ -122,7 +123,7 @@ function draw(n, today = new Date()) {
   command('neofetch'); y += LH + 8;
   const blockTop = y - FS + 2;
   // (a wireframe cube turning for good, as in the old demos)
-  const boot = t, CUBE = 92, cx = X0 + 26 * 14 / 2, cy = blockTop + CUBE / 2, FRAMES = 48;
+  const boot = t, CUBE = 108, cx = X0 + 26 * 14 / 2, cy = blockTop + CUBE / 2, FRAMES = 48;
   const V = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
   const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
   const frames = [...Array(FRAMES + 1).keys()].map((f) => {
@@ -130,7 +131,7 @@ function draw(n, today = new Date()) {
     return V.map(([x, y, z]) => {
       const x1 = x * Math.cos(a) + z * Math.sin(a), z1 = -x * Math.sin(a) + z * Math.cos(a);
       const y2 = y * Math.cos(b) - z1 * Math.sin(b), z2 = y * Math.sin(b) + z1 * Math.cos(b);
-      const k = (CUBE * 0.22) * (5 / (5 + z2));
+      const k = (CUBE * 0.24) * (5 / (5 + z2));
       return [cx + x1 * k, cy + y2 * k];
     });
   });
@@ -166,9 +167,8 @@ function draw(n, today = new Date()) {
     ['Uptime', uptime(n.since, today)],
     ['Repos', `${n.repos} public`],
     ['Contributions', `${n.contributions.toLocaleString('en-US')} this year`],
-    ['Commits', `${n.commits.toLocaleString('en-US')} this year`],
     ['Streak', `${n.streak} day${n.streak === 1 ? '' : 's'} (best ${n.best})`],
-    ['Load avg', n.load.map((v) => v.toFixed(2)).join('  ')],
+    ['Per day', `${n.perDay[0].toFixed(1)} this week, ${n.perDay[1].toFixed(1)} this month`],
     ['Languages', top],
   ];
   rows.forEach(([k, v], i) => {
