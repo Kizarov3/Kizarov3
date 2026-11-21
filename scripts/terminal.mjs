@@ -67,7 +67,6 @@ const FORTUNES = [
   ['The cheapest, fastest, and most reliable components are those that aren\'t there.', 'Gordon Bell'],
   ['Testing shows the presence, not the absence of bugs.', 'Edsger W. Dijkstra'],
   ['A language that doesn\'t affect the way you think about programming is not worth knowing.', 'Alan Perlis'],
-  ['Optimism is an occupational hazard of programming; feedback is the treatment.', 'Kent Beck'],
   ['Walking on water and developing software from a specification are easy if both are frozen.', 'Edward V. Berard'],
   ['Programs must be written for people to read, and only incidentally for machines to execute.', 'Harold Abelson'],
   ['Any fool can write code that a computer can understand. Good programmers write code that humans can understand.', 'Martin Fowler'],
