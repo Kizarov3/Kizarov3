@@ -1,5 +1,5 @@
 // Draws terminal.svg: a retro terminal that switches on, types cat about.txt, neofetch (this account's numbers from
-// GitHub), a heatmap of the last year's contributions and fortune (a different quote each day), then blinks a cursor.
+// GitHub), a heatmap of the last 26 weeks and fortune (a different quote each day), then blinks a cursor.
 // Run daily by .github/workflows/terminal.yml; by hand:
 //   GITHUB_TOKEN=$(gh auth token) node scripts/terminal.mjs terminal.svg
 import fs from 'node:fs';
@@ -80,7 +80,7 @@ const FORTUNES = [
 ];
 
 // ---- drawing ----
-const W = 880, FS = 18, CW = 10.8, X0 = 32, PROMPT = 'kizarov3@github:~$';
+const W = 880, FS = 15, CW = 9, LH = 22, X0 = 28, BAR = 30, PROMPT = 'kizarov3@github:~$';
 const GREEN = '#3fdc6a', TEXT = '#d4f8dc', DIM = '#5b8a66', AMBER = '#ffb000', BG = '#0a0f0b';
 const RAMP = ['#10261a', '#1a5c2c', '#2a9c48', '#3fdc6a', '#b8ffc8'];
 const FONT = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
@@ -88,27 +88,15 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const f2 = (v) => v.toFixed(2);
 const run = (x, y, s, fill, extra = '') => `<text x="${f2(x)}" y="${y}" fill="${fill}" xml:space="preserve" style="white-space:pre" textLength="${f2(s.length * CW)}" lengthAdjust="spacingAndGlyphs"${extra}>${esc(s)}</text>`;
 const appear = (t, inner) => `<g opacity="0"><set attributeName="opacity" to="1" begin="${f2(t)}s" fill="freeze"/>${inner}</g>`;
-const PIXELS = { // 5×7
-  K: ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
-  3: ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
-};
-
-function wrap(text, width) {
-  const lines = [''];
-  for (const word of text.split(' ')) {
-    const last = lines[lines.length - 1];
-    if (last && (last + ' ' + word).length > width) lines.push(word);
-    else lines[lines.length - 1] = last ? `${last} ${word}` : word;
-  }
-  return lines;
-}
+// (fortune's quote and its author on one line)
+const ONE_LINE = FORTUNES.filter(([q, who]) => q.length + who.length + 3 <= Math.floor((W - 2 * X0) / CW));
 
 function draw(n, today = new Date()) {
   const dayNo = Math.floor(today / 864e5);
   let seed = dayNo; // (the keys' rhythm, the same all day)
   const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
   const parts = [], clips = [];
-  let t = 0.75, y = 72, clipNo = 0;
+  let t = 0.75, y = BAR + 30, clipNo = 0;
   const px = X0 + (PROMPT.length + 1) * CW;
 
   // text typed a letter at a time (unevenly, as hands do), the cursor going along
@@ -117,9 +105,9 @@ function draw(n, today = new Date()) {
     for (let k = 0; k < s.length; k++) steps.push(steps[k] + perKey * (0.6 + rnd() * 0.9));
     const dur = steps[steps.length - 1] || 0.01, keys = steps.map((v) => (v / dur).toFixed(4)).join(';');
     const id = `c${clipNo++}`;
-    clips.push(`<clipPath id="${id}"><rect x="${f2(x)}" y="${yy - FS}" width="0" height="${FS + 8}"><animate attributeName="width" values="${steps.map((_, k) => f2(k * CW)).join(';')}" keyTimes="${keys}" calcMode="discrete" begin="${f2(at)}s" dur="${f2(dur)}s" fill="freeze"/></rect></clipPath>`);
+    clips.push(`<clipPath id="${id}"><rect x="${f2(x)}" y="${yy - FS}" width="0" height="${FS + 7}"><animate attributeName="width" values="${steps.map((_, k) => f2(k * CW)).join(';')}" keyTimes="${keys}" calcMode="discrete" begin="${f2(at)}s" dur="${f2(dur)}s" fill="freeze"/></rect></clipPath>`);
     parts.push(`<g clip-path="url(#${id})">${run(x, yy, s, fill)}</g>`);
-    if (cursor) parts.push(`<rect x="${f2(x)}" y="${yy - FS + 3}" width="${CW}" height="${FS + 1}" fill="${GREEN}" opacity="0"><set attributeName="opacity" to="1" begin="${f2(at - 0.35)}s"/><set attributeName="opacity" to="0" begin="${f2(at + dur + 0.25)}s"/><animate attributeName="x" values="${steps.map((_, k) => f2(x + k * CW)).join(';')}" keyTimes="${keys}" calcMode="discrete" begin="${f2(at)}s" dur="${f2(dur)}s" fill="freeze"/></rect>`);
+    if (cursor) parts.push(`<rect x="${f2(x)}" y="${yy - FS + 2}" width="${CW}" height="${FS + 1}" fill="${GREEN}" opacity="0"><set attributeName="opacity" to="1" begin="${f2(at - 0.25)}s"/><set attributeName="opacity" to="0" begin="${f2(at + dur + 0.2)}s"/><animate attributeName="x" values="${steps.map((_, k) => f2(x + k * CW)).join(';')}" keyTimes="${keys}" calcMode="discrete" begin="${f2(at)}s" dur="${f2(dur)}s" fill="freeze"/></rect>`);
     return at + dur;
   };
   const command = (cmd) => {
@@ -128,24 +116,52 @@ function draw(n, today = new Date()) {
   };
 
   // 1. about
-  command('cat about.txt'); y += 32;
-  parts.push(appear(t, run(X0, y, "I make apps I'd want to use myself.", TEXT))); t += 0.4; y += 46;
+  command('cat about.txt'); y += LH;
+  parts.push(appear(t, run(X0, y, "I make apps I'd want to use myself.", TEXT))); t += 0.4; y += LH + 12;
 
-  // 2. neofetch: K3 in pixels on the left, the numbers on the right
-  command('neofetch'); y += 40;
-  const LH = 26, rx = X0 + 190, cell = 12, gap = 2, logoTop = y + 2;
-  const logo = [];
-  ['K', '3'].forEach((ch, li) => PIXELS[ch].forEach((row, r) => [...row].forEach((on, c) => {
-    if (on === '1') logo.push({ x: X0 + 4 + li * 84 + c * (cell + gap), y: logoTop + r * (cell + gap), r });
-  })));
-  const boot = t;
-  const pixels = (fill) => logo.map((p) => `<rect x="${p.x}" y="${p.y}" width="${cell}" height="${cell}" fill="${fill}"/>`).join('');
-  // (row by row as it boots)
-  for (let r = 0; r < 7; r++) parts.push(appear(boot + r * 0.04, logo.filter((p) => p.r === r).map((p) => `<rect x="${p.x}" y="${p.y}" width="${cell}" height="${cell}" fill="${GREEN}"/>`).join('')));
-  // (and a glitch every 6 s: shifted, with red and cyan ghosts)
-  const glitch = (fill, dx) => `<g opacity="0">${pixels(fill)}<animate attributeName="opacity" values="0;.45;0" keyTimes="0;.98;1" calcMode="discrete" dur="6s" begin="${f2(boot + 2)}s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0;${dx} 0;0 0" keyTimes="0;.98;1" calcMode="discrete" dur="6s" begin="${f2(boot + 2)}s" repeatCount="indefinite"/></g>`;
-  parts.push(glitch('#ff3b5c', -3), glitch('#36e0ff', 3));
-  const top = n.languages.slice(0, 3).map((l) => `${l.name} ${Math.round(l.share * 100)}%`).join(' · ');
+  // 2. neofetch: on the left a turning cube and the last 26 weeks as a heatmap, on the right the numbers
+  command('neofetch'); y += LH + 8;
+  const blockTop = y - FS + 2;
+  // (a wireframe cube turning for good, as in the old demos)
+  const boot = t, CUBE = 92, cx = X0 + 26 * 14 / 2, cy = blockTop + CUBE / 2, FRAMES = 48;
+  const V = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+  const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+  const frames = [...Array(FRAMES + 1).keys()].map((f) => {
+    const a = (f / FRAMES) * 2 * Math.PI, b = 0.5 + 0.25 * Math.sin(a);
+    return V.map(([x, y, z]) => {
+      const x1 = x * Math.cos(a) + z * Math.sin(a), z1 = -x * Math.sin(a) + z * Math.cos(a);
+      const y2 = y * Math.cos(b) - z1 * Math.sin(b), z2 = y * Math.sin(b) + z1 * Math.cos(b);
+      const k = (CUBE * 0.22) * (5 / (5 + z2));
+      return [cx + x1 * k, cy + y2 * k];
+    });
+  });
+  const vals = (pick) => frames.map(pick).map(f2).join(';');
+  const spin = `dur="8s" begin="${f2(boot)}s" repeatCount="indefinite"`;
+  const edges = E.map(([i, j]) => `<line stroke="${GREEN}" stroke-width="1.6" stroke-linecap="round" x1="${f2(frames[0][i][0])}" y1="${f2(frames[0][i][1])}" x2="${f2(frames[0][j][0])}" y2="${f2(frames[0][j][1])}">${['x1', 'y1', 'x2', 'y2'].map((attr, n) => `<animate attributeName="${attr}" values="${vals((fr) => fr[n < 2 ? i : j][n % 2])}" ${spin}/>`).join('')}</line>`).join('');
+  const dots = V.map((_, i) => `<circle r="2.4" fill="${TEXT}" cx="${f2(frames[0][i][0])}" cy="${f2(frames[0][i][1])}"><animate attributeName="cx" values="${vals((fr) => fr[i][0])}" ${spin}/><animate attributeName="cy" values="${vals((fr) => fr[i][1])}" ${spin}/></circle>`).join('');
+  parts.push(appear(boot, `${edges}${dots}`));
+
+  const weeks = n.weeks.slice(-26), hc = 11, hg = 3, hy = blockTop + CUBE + 14;
+  const counts = n.weeks.flat().map((d) => d.contributionCount).filter(Boolean).sort((a, b) => a - b);
+  const q = (p) => counts[Math.min(counts.length - 1, Math.floor(p * counts.length))] || 1;
+  const cuts = [q(0.25), q(0.5), q(0.75)];
+  const level = (c) => (!c ? 0 : c <= cuts[0] ? 1 : c <= cuts[1] ? 2 : c <= cuts[2] ? 3 : 4);
+  const mapAt = boot + 0.3;
+  weeks.forEach((week, wi) => {
+    const cells = week.map((d, di) => {
+      const day = new Date(`${d.date}T00:00:00Z`).getUTCDay();
+      const isToday = wi === weeks.length - 1 && di === week.length - 1;
+      const blink = isToday ? `<animate attributeName="opacity" values="1;.25" dur="1.06s" calcMode="discrete" repeatCount="indefinite" begin="${f2(mapAt + 1)}s"/>` : '';
+      return `<rect x="${X0 + wi * (hc + hg)}" y="${hy + day * (hc + hg)}" width="${hc}" height="${hc}" rx="2" fill="${RAMP[level(d.contributionCount)]}">${blink}</rect>`;
+    }).join('');
+    parts.push(appear(mapAt + wi * 0.025, cells));
+  });
+  const mapW = weeks.length * (hc + hg) - hg, ly = hy + 7 * (hc + hg) + 12;
+  const legendX = X0 + mapW - (4 * CW + 6 + 5 * (hc + hg) + 4 + 4 * CW);
+  parts.push(appear(mapAt + 0.7, `${run(X0, ly, '26 weeks', DIM)}${run(legendX, ly, 'less', DIM)}${RAMP.map((c, i) => `<rect x="${f2(legendX + 4 * CW + 6 + i * (hc + hg))}" y="${ly - 10}" width="${hc}" height="${hc}" rx="2" fill="${c}"/>`).join('')}${run(legendX + 4 * CW + 6 + 5 * (hc + hg) + 4, ly, 'more', DIM)}`));
+
+  const rx = X0 + mapW + 40;
+  const top = n.languages.slice(0, 3).map((l) => `${l.name} ${Math.round(l.share * 100)}%`).join(', ');
   const rows = [
     ['', 'kizarov3@github'], ['', '─'.repeat(15)],
     ['Uptime', uptime(n.since, today)],
@@ -161,76 +177,53 @@ function draw(n, today = new Date()) {
     if (!k) parts.push(appear(when, run(rx, yy, v, i ? DIM : GREEN, i ? '' : ' font-weight="bold"')));
     else parts.push(appear(when, `${run(rx, yy, `${k}:`, AMBER, ' opacity=".9"')}${run(rx + (k.length + 2) * CW, yy, v, TEXT)}`));
   });
-  y += rows.length * LH - 8;
   t += 0.045 * rows.length;
   // the languages as a bar in the screen's own greens
+  const barY = y + rows.length * LH - 10;
   let bx = rx;
-  const bw = 400, bar = n.languages.filter((l) => l.share >= 0.01), shares = bar.reduce((s, l) => s + l.share, 0) || 1;
+  const bw = W - X0 - rx, bar = n.languages.filter((l) => l.share >= 0.01), shares = bar.reduce((s, l) => s + l.share, 0) || 1;
   const greens = ['#3fdc6a', '#2a9c48', '#b8ffc8', '#1a5c2c', '#7ef0a0'];
-  const segs = bar.map((l, i) => { const w = (l.share / shares) * bw, r = `<rect x="${f2(bx)}" y="${y}" width="${f2(Math.max(0, w - 2))}" height="8" fill="${greens[i % greens.length]}"/>`; bx += w; return r; }).join('');
-  clips.push(`<clipPath id="bar"><rect x="${rx}" y="${y}" width="0" height="8"><animate attributeName="width" from="0" to="${bw}" begin="${f2(t)}s" dur="0.6s" fill="freeze"/></rect></clipPath>`);
+  const segs = bar.map((l, i) => { const w = (l.share / shares) * bw, r = `<rect x="${f2(bx)}" y="${barY}" width="${f2(Math.max(0, w - 2))}" height="7" fill="${greens[i % greens.length]}"/>`; bx += w; return r; }).join('');
+  clips.push(`<clipPath id="bar"><rect x="${rx}" y="${barY}" width="0" height="7"><animate attributeName="width" from="0" to="${bw}" begin="${f2(t)}s" dur="0.6s" fill="freeze"/></rect></clipPath>`);
   parts.push(`<g clip-path="url(#bar)">${segs}</g>`);
-  t += 0.7; y += 58;
+  t = Math.max(t + 0.6, mapAt + 0.9);
+  y = Math.max(barY + 7, ly) + 36;
 
-  // 3. the last year as a heatmap, column by column, today's cell blinking
-  command('git log --since=1.year | heatmap'); y += 22;
-  const counts = n.weeks.flat().map((d) => d.contributionCount).filter(Boolean).sort((a, b) => a - b);
-  const q = (p) => counts[Math.min(counts.length - 1, Math.floor(p * counts.length))] || 1;
-  const cuts = [q(0.25), q(0.5), q(0.75)];
-  const level = (c) => (!c ? 0 : c <= cuts[0] ? 1 : c <= cuts[1] ? 2 : c <= cuts[2] ? 3 : 4);
-  const hc = 12, hg = 3, cols = n.weeks.length, hx = X0 + Math.round((W - 2 * X0 - cols * (hc + hg) + hg) / 2);
-  const sweep = 0.8 / cols;
-  n.weeks.forEach((week, wi) => {
-    const cells = week.map((d) => {
-      const di = new Date(`${d.date}T00:00:00Z`).getUTCDay();
-      const isToday = wi === cols - 1 && d === week[week.length - 1];
-      const blink = isToday ? `<animate attributeName="opacity" values="1;.25" dur="1.06s" calcMode="discrete" repeatCount="indefinite" begin="${f2(t + 1)}s"/>` : '';
-      return `<rect x="${hx + wi * (hc + hg)}" y="${y + di * (hc + hg)}" width="${hc}" height="${hc}" rx="2" fill="${RAMP[level(d.contributionCount)]}">${blink}</rect>`;
-    }).join('');
-    parts.push(appear(t + wi * sweep, cells));
-  });
-  y += 7 * (hc + hg) + 18;
-  t += 0.9;
-  const legendX = hx + cols * (hc + hg) - hg - (4 * CW + 6 + 5 * (hc + hg) + 4 + 4 * CW); // (right under the map's right edge)
-  parts.push(appear(t, `${run(hx, y, `${n.contributions.toLocaleString('en-US')} contributions in the last year`, DIM)}${run(legendX, y, 'less', DIM)}${RAMP.map((c, i) => `<rect x="${f2(legendX + 4 * CW + 6 + i * (hc + hg))}" y="${y - 11}" width="${hc}" height="${hc}" rx="2" fill="${c}"/>`).join('')}${run(legendX + 4 * CW + 6 + 5 * (hc + hg) + 4, y, 'more', DIM)}`));
-  t += 0.4; y += 48;
-
-  // 4. fortune
-  command('fortune'); y += 32;
-  const [quote, who] = FORTUNES[dayNo % FORTUNES.length];
-  for (const line of wrap(quote, 72)) { t = typed(X0, y, line, TEXT, t, 0.016, false); y += 26; }
-  t += 0.15;
-  parts.push(appear(t, run(X0 + 2 * CW, y, `— ${who}`, AMBER, ' opacity=".9"')));
-  t += 0.5; y += 46;
+  // 3. fortune, one a day
+  command('fortune'); y += LH;
+  const [quote, who] = ONE_LINE[dayNo % ONE_LINE.length];
+  t = typed(X0, y, quote, TEXT, t, 0.016, false) + 0.15;
+  parts.push(appear(t, run(X0 + (quote.length + 1) * CW, y, `— ${who}`, AMBER, ' opacity=".9"')));
+  t += 0.5; y += LH + 12;
 
   // and the cursor, blinking for good
-  parts.push(appear(t, `${run(X0, y, PROMPT, GREEN)}<rect x="${f2(px)}" y="${y - FS + 3}" width="${CW}" height="${FS + 1}" fill="${GREEN}"><animate attributeName="opacity" values="1;0" dur="1.06s" calcMode="discrete" repeatCount="indefinite" begin="${f2(t)}s"/></rect>`));
-  const H = y + 28;
-  const label = `A retro terminal. cat about.txt: I make apps I'd want to use myself. neofetch: ${rows.slice(2).map(([k, v]) => `${k} ${v}`).join('; ')}. A heatmap of ${n.contributions} contributions in the last year. fortune: ${quote} (${who})`;
+  parts.push(appear(t, `${run(X0, y, PROMPT, GREEN)}<rect x="${f2(px)}" y="${y - FS + 2}" width="${CW}" height="${FS + 1}" fill="${GREEN}"><animate attributeName="opacity" values="1;0" dur="1.06s" calcMode="discrete" repeatCount="indefinite" begin="${f2(t)}s"/></rect>`));
+  const H = y + 20;
+  const label = `A retro terminal. cat about.txt: I make apps I'd want to use myself. neofetch: ${rows.slice(2).map(([k, v]) => `${k} ${v}`).join('; ')}, beside a heatmap of the last 26 weeks. fortune: ${quote} (${who})`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">
 <defs>
-<filter id="glow" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-<pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="1" fill="#000" opacity=".35"/></pattern>
+<filter id="glow" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="1.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<pattern id="scan" width="3" height="3" patternUnits="userSpaceOnUse"><rect width="3" height="1" fill="#000" opacity=".35"/></pattern>
 <radialGradient id="vignette" cx="50%" cy="50%" r="75%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".55"/></radialGradient>
 <linearGradient id="band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-<clipPath id="screen"><rect width="${W}" height="${H}" rx="14"/></clipPath>
+<clipPath id="screen"><rect width="${W}" height="${H}" rx="12"/></clipPath>
 ${clips.join('\n')}
 </defs>
 <g clip-path="url(#screen)">
 <rect width="${W}" height="${H}" fill="${BG}"/>
-<rect width="${W}" height="38" fill="#121a14"/>
-<circle cx="24" cy="19" r="6" fill="#ff5f57" opacity=".85"/><circle cx="44" cy="19" r="6" fill="#febc2e" opacity=".85"/><circle cx="64" cy="19" r="6" fill="#28c840" opacity=".85"/>
-<text x="${W / 2}" y="24" fill="${DIM}" font-size="13" text-anchor="middle" font-family="${FONT}">kizarov3 — zsh</text>
+<rect width="${W}" height="${BAR}" fill="#121a14"/>
+<circle cx="20" cy="15" r="5" fill="#ff5f57" opacity=".85"/><circle cx="37" cy="15" r="5" fill="#febc2e" opacity=".85"/><circle cx="54" cy="15" r="5" fill="#28c840" opacity=".85"/>
+<text x="${W / 2}" y="19" fill="${DIM}" font-size="12" text-anchor="middle" font-family="${FONT}">kizarov3 — zsh</text>
 <g font-family="${FONT}" font-size="${FS}" filter="url(#glow)">
 ${parts.join('\n')}
 </g>
-<rect y="38" width="${W}" height="${H - 38}" fill="url(#scan)"/>
-<rect x="0" y="-80" width="${W}" height="80" fill="url(#band)"><animate attributeName="y" values="-80;${H}" dur="7s" begin="1s" repeatCount="indefinite"/></rect>
+<rect y="${BAR}" width="${W}" height="${H - BAR}" fill="url(#scan)"/>
+<rect x="0" y="-70" width="${W}" height="70" fill="url(#band)"><animate attributeName="y" values="-70;${H}" dur="6s" begin="1s" repeatCount="indefinite"/></rect>
 <rect width="${W}" height="${H}" fill="#000" opacity="0"><animate attributeName="opacity" values="0;.08;0;.05;0" keyTimes="0;.96;.97;.985;1" calcMode="discrete" dur="11s" begin="3s" repeatCount="indefinite"/></rect>
 <rect width="${W}" height="${H}" fill="url(#vignette)"/>
-<g><rect x="0" y="${H / 2 - 1}" width="${W}" height="2" fill="#d4f8dc"><animate attributeName="y" values="${H / 2 - 1};38" dur="0.35s" begin="0.15s" fill="freeze"/><animate attributeName="height" values="2;${H - 38}" dur="0.35s" begin="0.15s" fill="freeze"/><animate attributeName="opacity" values="1;.7;0" dur="0.5s" begin="0.15s" fill="freeze"/></rect></g>
+<rect x="0" y="${H / 2 - 1}" width="${W}" height="2" fill="#d4f8dc"><animate attributeName="y" values="${H / 2 - 1};${BAR}" dur="0.35s" begin="0.15s" fill="freeze"/><animate attributeName="height" values="2;${H - BAR}" dur="0.35s" begin="0.15s" fill="freeze"/><animate attributeName="opacity" values="1;.7;0" dur="0.5s" begin="0.15s" fill="freeze"/></rect>
 </g>
-<rect x=".5" y=".5" width="${W - 1}" height="${H - 1}" rx="14" fill="none" stroke="#2a3a2e"/>
+<rect x=".5" y=".5" width="${W - 1}" height="${H - 1}" rx="12" fill="none" stroke="#2a3a2e"/>
 </svg>
 `;
 }
